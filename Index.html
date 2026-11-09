@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="th"><head><base target="_top"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mini Editor</title>
+<style>
+:root{--bg:#14161b;--pn:#1c1f26;--ln:#2b303b;--tx:#e7e9ee;--mu:#8d95a6;--ac:#3ddc97}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;background:var(--bg);color:var(--tx);font:13px/1.4 system-ui,"Noto Sans Thai",sans-serif}
+button,select{background:var(--ln);color:var(--tx);border:0;border-radius:5px;padding:6px 10px;font:inherit;cursor:pointer}
+button:hover{filter:brightness(1.2)}button:focus-visible,input:focus-visible{outline:2px solid var(--ac)}
+header{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--ln)}
+header h1{font-size:14px;margin:0 auto 0 0}
+#exp{background:var(--ac);color:#04150d;font-weight:600}
+main{flex:1;min-height:0;display:grid;grid-template-columns:230px 1fr 250px}
+aside{background:var(--pn);padding:10px;overflow:auto}
+aside h2{font-size:12px;color:var(--mu);margin:0 0 8px;font-weight:500}
+#left{border-right:1px solid var(--ln)}#props{border-left:1px solid var(--ln)}
+.card{display:flex;align-items:center;gap:6px;padding:6px;margin-top:6px;background:var(--bg);border-radius:5px}
+.card span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card button{padding:2px 9px}
+#stage{display:flex;align-items:center;justify-content:center;padding:12px;min-width:0;min-height:0}
+canvas{max-width:100%;max-height:100%;background:#000}
+#props label{display:block;margin-bottom:10px;color:var(--mu)}
+#props input{display:block;width:100%;margin-top:3px}
+#props input:not([type]){background:var(--bg);color:var(--tx);border:1px solid var(--ln);border-radius:4px;padding:5px}
+.hint{color:var(--mu)}
+#bar{display:flex;gap:6px;align-items:center;padding:6px 12px;border-top:1px solid var(--ln);background:var(--pn)}
+#time{font-variant-numeric:tabular-nums;color:var(--mu);margin-left:8px}
+#bar input{width:90px}
+#tl{height:230px;overflow:auto;position:relative;background:var(--bg);user-select:none}
+.ruler{height:22px;position:relative;border-bottom:1px solid var(--ln);color:var(--mu);font-size:10px}
+.ruler span{position:absolute;top:4px;padding-left:3px;border-left:1px solid var(--ln)}
+.row{height:40px;position:relative;border-bottom:1px solid var(--ln);white-space:nowrap}
+.lab{position:sticky;left:0;display:inline-block;width:60px;height:100%;background:var(--pn);z-index:3;padding:11px 6px;font-weight:400;color:var(--mu);font-size:11px;border-right:1px solid var(--ln)}
+.clip{position:absolute;top:4px;height:32px;border-radius:5px;padding:7px 8px;overflow:hidden;font-size:11px;color:#fff;cursor:grab;text-overflow:ellipsis}
+.clip.video{background:#2a6fdb}.clip.image{background:#7a4fd6}.clip.audio{background:#1f9a6b}.clip.text{background:#c47a12}
+.clip.sel{outline:2px solid #fff;z-index:2}
+.h{position:absolute;top:0;bottom:0;width:7px;cursor:ew-resize;background:rgba(255,255,255,.35)}
+.h.l{left:0}.h.r{right:0}
+#ph{position:absolute;top:0;bottom:0;width:2px;background:#ff5d5d;z-index:5;pointer-events:none;height:100%}
+#pname{width:130px;background:var(--bg);color:var(--tx);border:1px solid var(--ln);border-radius:5px;padding:5px}
+#msg{color:var(--ac);font-weight:400;margin-left:8px}
+#props select{width:100%;margin-top:3px}
+.lab u{position:absolute;right:3px;top:11px;text-decoration:none;cursor:pointer;opacity:.6}
+.clip{text-shadow:0 1px 2px #000a}
+#props button{margin-top:4px}
+h1 svg{width:22px;height:22px;vertical-align:-5px}
+</style></head>
+<body>
+<header>
+  <h1><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#1c1f26"/><rect x="92" y="130" width="228" height="66" rx="18" fill="#2a6fdb"/><rect x="190" y="224" width="234" height="66" rx="18" fill="#1f9a6b"/><rect x="92" y="318" width="176" height="66" rx="18" fill="#c47a12"/><path d="M250 84h12v346h-12zM232 84h48l-24 32z" fill="#ff5d5d"/></svg> Mini Editor <small id="msg"></small></h1>
+  <input id="pname" placeholder="ชื่อโปรเจกต์"><select id="prj"><option value="">เปิดโปรเจกต์…</option></select><button id="sv">บันทึก</button>
+  <select id="ratio"><option value="1280x720">16:9</option><option value="720x1280">9:16</option><option value="720x720">1:1</option></select>
+  <button id="exp">ส่งออก</button>
+</header>
+<main>
+  <aside id="left">
+    <h2>คลังสื่อ</h2>
+    <button id="imp">นำเข้าไฟล์</button> <button id="addT">เพิ่มข้อความ</button>
+    <input id="file" type="file" accept="video/*,audio/*,image/*" multiple hidden>
+    <div id="media"></div>
+  </aside>
+  <div id="stage"><canvas id="cv" width="1280" height="720"></canvas></div>
+  <aside id="props"></aside>
+</main>
+<div id="bar">
+  <button id="pl">เล่น</button><button id="sp">ตัด</button><button id="dl">ลบ</button>
+  <button id="un">ย้อนกลับ</button><button id="re">ทำซ้ำ</button><button id="at">+ แทร็กวิดีโอ</button><button id="aa">+ แทร็กเสียง</button><button id="ax">+ แทร็กข้อความ</button>
+  <span id="time">0:00.0</span>
+  <span style="margin-left:auto" class="hint">ซูม</span><input id="zoom" type="range" min="20" max="240" value="80">
+</div>
+<div id="tl"></div>
+
+<script>
+const $=s=>document.querySelector(s), OFF=60, RH=22, ROW=40;
+// โครงสร้างข้อมูล: tracks[] -> clips[] (ใช้ซ้ำได้ในเฟส 2-3: เพิ่ม keyframes/effects ใน clip.p)
+const P={W:1280,H:720,media:{},tracks:[
+  {name:'ข้อความ',kind:'text',clips:[]},{name:'วิดีโอ 2',kind:'video',clips:[]},
+  {name:'วิดีโอ 1',kind:'video',mag:true,clips:[]},{name:'เสียง',kind:'audio',clips:[]}]};
+let t=0,playing=false,sel=null,pps=80,uid=1,hist=[],redo=[],last=0,rec=null,dirty=false;
+const cv=$('#cv'),g=cv.getContext('2d');
+const AC=new (window.AudioContext||window.webkitAudioContext)(),DEST=AC.createMediaStreamDestination();
+const P0={x:.5,y:.5,scale:1,rot:0,opacity:1,volume:1,speed:1,fi:0,fo:0,bright:1,contrast:1,sat:1,hue:0,blur:0,preset:'none',tin:'none',tout:'none',td:.5,mask:'none',msize:.8};
+let prjId=null;
+const msg=s=>{$('#msg').textContent=s;clearTimeout(msg.h);msg.h=setTimeout(()=>$('#msg').textContent='',5000)};
+const PRE={none:'',bw:'grayscale(1)',sepia:'sepia(1)',warm:'sepia(.35) saturate(1.3)',cool:'hue-rotate(-20deg) saturate(1.1)',fade:'contrast(.85) brightness(1.1) saturate(.8)',vivid:'saturate(1.6) contrast(1.1)'};
+const PRN={none:'ไม่มี',bw:'ขาวดำ',sepia:'ซีเปีย',warm:'อุ่น',cool:'เย็น',fade:'จาง',vivid:'สดจัด'};
+// เรียงคลิป กันซ้อนทับ; แทร็ก mag = ดูดชิดกัน (Magnetic/Ripple)
+function fix(r){r.clips.sort((a,b)=>a.start-b.start);let e=0;for(const c of r.clips){c.start=r.mag?e:Math.max(c.start,e);e=c.start+c.dur}}
+const all=()=>P.tracks.flatMap(r=>r.clips), find=id=>all().find(c=>c.id===id);
+const trackOf=c=>P.tracks.find(r=>r.clips.includes(c));
+const dur=()=>Math.max(0,...all().map(c=>c.start+c.dur));
+const fmt=s=>Math.floor(s/60)+':'+(s%60).toFixed(1).padStart(4,'0');
+const kindOf=c=>c.type==='image'?'video':c.type;
+
+// ---------- ประวัติ Undo/Redo ----------
+function save(){hist.push(JSON.stringify(P.tracks));if(hist.length>60)hist.shift();redo=[]}
+function restore(s){P.tracks=JSON.parse(s);if(!find(sel))sel=null;all2()}
+function undo(){if(!hist.length)return;redo.push(JSON.stringify(P.tracks));restore(hist.pop())}
+function redoF(){if(!redo.length)return;hist.push(JSON.stringify(P.tracks));restore(redo.pop())}
+function all2(){renderTL();renderProps();render()}
+
+// ---------- นำเข้าไฟล์ ----------
+$('#imp').onclick=()=>$('#file').click();
+$('#file').onchange=async e=>{
+  for(const f of e.target.files){
+    const type=f.type.startsWith('video')?'video':f.type.startsWith('audio')?'audio':'image';
+    const el=document.createElement(type==='image'?'img':type);el.src=URL.createObjectURL(f);
+    if(type!=='image'){el.preload='auto';el.playsInline=true;el.onseeked=()=>{if(!playing)draw()}}
+    await new Promise(r=>{el[type==='image'?'onload':'onloadedmetadata']=r;el.onerror=r});
+    if(type!=='image'){const s=AC.createMediaElementSource(el);s.connect(AC.destination);s.connect(DEST)}
+    const ex=Object.values(P.media).find(x=>x.missing&&x.name===f.name),id=ex?ex.id:'m'+uid++;
+    const m=P.media[id]={id,name:f.name,type,el,url:el.src,dur:ex?ex.dur:type==='image'?5:(el.duration||5)};strip(m);
+  }
+  e.target.value='';renderMedia();
+};
+function renderMedia(){
+  $('#media').innerHTML=Object.values(P.media).map(m=>`<div class="card"><span title="${m.name}">${m.missing?'⚠':m.type==='video'?'▶':m.type==='audio'?'♪':'▣'} ${m.name}</span><button data-m="${m.id}">+</button></div>`).join('')||'<p class="hint">นำเข้าวิดีโอ รูป หรือเสียงเพื่อเริ่มต้น</p>';
+}
+$('#media').onclick=e=>{const id=e.target.dataset.m;if(!id)return;const m=P.media[id];
+  const tr=m.type==='audio'?P.tracks.find(r=>r.kind==='audio'):P.tracks.find(r=>r.mag)||P.tracks.find(r=>r.kind==='video');if(!tr)return msg('ไม่มีแทร็กที่ใช้ได้ กด + แทร็ก');save();
+  const c={id:'c'+uid++,mid:id,type:m.type,start:Math.max(0,...tr.clips.map(x=>x.start+x.dur)),inPt:0,dur:m.dur,p:{...P0}};
+  tr.clips.push(c);sel=c.id;all2()};
+$('#addT').onclick=()=>{save();const c={id:'c'+uid++,type:'text',start:t,inPt:0,dur:3,p:{...P0,y:.8,text:'ข้อความ',size:72,color:'#ffffff'}};
+  const r=P.tracks.find(r=>r.kind==='text');if(!r)return msg('ไม่มีแทร็กข้อความ');r.clips.push(c);fix(r);sel=c.id;all2()};
+
+// ---------- วาดภาพพรีวิว ----------
+const active=()=>{const r=[];for(let i=P.tracks.length-1;i>=0;i--)for(const c of P.tracks[i].clips)if(t>=c.start&&t<c.start+c.dur)r.push(c);return r};
+function sync(){
+  const on=new Set();
+  for(const c of active()){if(!c.mid)continue;const m=P.media[c.mid];if(m.type==='image')continue;
+    on.add(m.el);const w=t-c.start,sp=c.p.speed,want=c.inPt+w*sp,fd=Math.min(1,c.p.fi>0?w/c.p.fi:1,c.p.fo>0?(c.dur-w)/c.p.fo:1);m.el.playbackRate=sp;m.el.volume=Math.max(0,Math.min(1,c.p.volume*fd));
+    if(Math.abs(m.el.currentTime-want)>(playing?.35:.02))m.el.currentTime=want;
+    if(playing&&m.el.paused)m.el.play().catch(()=>{});}
+  for(const m of Object.values(P.media))if(m.type!=='image'&&!m.el.paused&&(!playing||!on.has(m.el)))m.el.pause();
+}
+function draw(){
+  g.globalAlpha=1;g.fillStyle='#000';g.fillRect(0,0,P.W,P.H);
+  for(const c of active()){const p=c.p;if(c.type==='audio')continue;
+    const lt=t-c.start,V=k=>val(c,k,lt),td=p.td||.5,a=p.tin&&p.tin!=='none'?Math.min(1,lt/td):1,b=p.tout&&p.tout!=='none'?Math.min(1,(c.dur-lt)/td):1;
+    let op=V('opacity'),sc=V('scale'),dx=0;g.save();
+    for(const [ty,q,sg] of [[p.tin,a,1],[p.tout,b,-1]]){if(q>=1||!ty||ty==='none')continue;
+      if(ty==='fade')op*=q;else if(ty==='slide')dx+=sg*(1-q)*P.W;else if(ty==='zoom'){sc*=.5+.5*q;op*=q}
+      else if(ty==='wipe'){g.beginPath();g.rect(0,0,P.W*q,P.H);g.clip()}}
+    g.globalAlpha=Math.max(0,Math.min(1,op));g.translate(V('x')*P.W+dx,V('y')*P.H);g.rotate(V('rot')*Math.PI/180);g.scale(sc,sc);
+    if(c.type==='text'){g.font=`bold ${p.size}px "Noto Sans Thai",sans-serif`;g.textAlign='center';g.textBaseline='middle';
+      g.lineJoin='round';g.lineWidth=p.size/8;g.strokeStyle='#000';g.fillStyle=p.color;const ls=wrap(String(p.text),P.W*.9/sc);ls.forEach((l,i)=>{const yy=(i-(ls.length-1)/2)*p.size*1.2;g.strokeText(l,0,yy);g.fillText(l,0,yy)})}
+    else{g.filter=`brightness(${p.bright}) contrast(${p.contrast}) saturate(${p.sat}) hue-rotate(${p.hue}deg) blur(${p.blur}px) ${PRE[p.preset]||''}`;const e=P.media[c.mid].el,w=e.videoWidth||e.naturalWidth,h=e.videoHeight||e.naturalHeight;
+      if(w){const f=Math.min(P.W/w,P.H/h);const iw=w*f,ih=h*f,mk=p.mask,s=p.msize||1;g.beginPath();if(mk==='circle')g.arc(0,0,Math.min(iw,ih)/2*s,0,7);else if(mk==='ellipse')g.ellipse(0,0,iw/2*s,ih/2*s,0,0,7);else if(mk==='rect')g.rect(-iw/2*s,-ih/2*s,iw*s,ih*s);if(mk&&mk!=='none')g.clip();g.drawImage(e,-iw/2,-ih/2,iw,ih)}}
+    g.restore()}
+}
+function render(){sync();draw();$('#ph').style.left=OFF+t*pps+'px';$('#time').textContent=fmt(t)+' / '+fmt(dur())}
+
+// ---------- เล่น / หยุด / ส่งออก ----------
+function play(){if(!dur())return;if(t>=dur())t=0;AC.resume();playing=true;last=performance.now();$('#pl').textContent='หยุด';requestAnimationFrame(tick)}
+function stop(){playing=false;$('#pl').textContent='เล่น';sync();if(rec){const r=rec;rec=null;r.stop()}}
+function tick(n){if(!playing)return;t+=(n-last)/1000;last=n;
+  if(t>=dur()){t=dur();render();stop();return}
+  render();if(rec)$('#exp').textContent=Math.round(t/dur()*100)+'%';requestAnimationFrame(tick)}
+$('#pl').onclick=()=>playing?stop():play();
+$('#exp').onclick=()=>{
+  if(!dur())return msg('ยังไม่มีคลิปใน Timeline');if(rec)return;
+  stop();t=0;render();AC.resume();
+  const vs=cv.captureStream(30);DEST.stream.getAudioTracks().forEach(x=>vs.addTrack(x));
+  const mt=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
+  const r=new MediaRecorder(vs,{mimeType:mt,videoBitsPerSecond:8e6}),ch=[];
+  r.ondataavailable=e=>ch.push(e.data);
+  r.onstop=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(ch,{type:'video/webm'}));a.download='video.webm';a.click();$('#exp').textContent='ส่งออก'};
+  rec=r;r.start();play();
+};
+
+// ---------- Timeline ----------
+function label(c){return c.type==='text'?c.p.text:P.media[c.mid].name}
+function bg(c){const m=c.mid&&P.media[c.mid];if(!m||!m.strip)return'';const sp=c.p.speed;
+  return `background-image:url('${m.strip}');background-repeat:no-repeat;background-size:${m.dur/sp*pps}px 100%;background-position:${-c.inPt/sp*pps}px 0`}
+// Thumbnail (วิดีโอ) / Waveform (เสียง) เป็นภาพแถบเดียวต่อไฟล์
+async function strip(m){try{
+  if(m.type==='video'){const v=document.createElement('video');v.muted=true;v.src=m.url;
+    await new Promise(r=>{v.onloadeddata=r;v.onerror=r});
+    const n=Math.min(40,Math.ceil(m.dur/2)),c=document.createElement('canvas');c.width=n*80;c.height=45;const x=c.getContext('2d');
+    for(let i=0;i<n;i++){v.currentTime=(i+.5)*m.dur/n;await Promise.race([new Promise(r=>v.onseeked=r),new Promise(r=>setTimeout(r,2000))]);x.drawImage(v,i*80,0,80,45)}
+    m.strip=c.toDataURL('image/jpeg',.6)}
+  else if(m.type==='audio'){const b=await AC.decodeAudioData(await (await fetch(m.url)).arrayBuffer()),d=b.getChannelData(0),
+      W=Math.min(6000,Math.ceil(m.dur*30)),c=document.createElement('canvas');c.width=W;c.height=32;const x=c.getContext('2d');
+    x.fillStyle='rgba(255,255,255,.7)';const k=Math.floor(d.length/W);
+    for(let i=0;i<W;i++){let mx=0;for(let j=0;j<k;j+=8)mx=Math.max(mx,Math.abs(d[i*k+j]));const h=Math.max(1,mx*30);x.fillRect(i,16-h/2,1,h)}
+    m.strip=c.toDataURL()}
+  renderTL()}catch(e){}}
+function renderTL(){
+  const w=OFF+Math.max(dur()+10,30)*pps,step=pps<40?10:pps<100?5:1;
+  let h=`<div class="ruler" style="width:${w}px">`;
+  for(let s=0;OFF+s*pps<w;s+=step)h+=`<span style="left:${OFF+s*pps}px">${fmt(s).slice(0,-2)}</span>`;
+  h+='</div>';
+  P.tracks.forEach((r,ri)=>{h+=`<div class="row" style="width:${w}px"><b class="lab">${r.name}<u data-del="${ri}">✕</u></b>`;
+    for(const c of r.clips)h+=`<div class="clip ${c.type}${c.id===sel?' sel':''}" data-id="${c.id}" style="left:${OFF+c.start*pps}px;width:${c.dur*pps}px;${bg(c)}"><i class="h l"></i>${label(c)}<i class="h r"></i></div>`;
+    h+='</div>'});
+  $('#tl').innerHTML=h+'<div id="ph"></div>';$('#ph').style.left=OFF+t*pps+'px';
+}
+function snapTo(v){const pts=[0,t];all().forEach(c=>pts.push(c.start,c.start+c.dur));
+  let b=v,d=8/pps;for(const p of pts)if(Math.abs(p-v)<d){d=Math.abs(p-v);b=p}return b}
+function seek(s){t=Math.min(Math.max(0,s),Math.max(dur(),0));render();if(!playing)renderProps()}
+$('#tl').onmousedown=e=>{
+  const T=$('#tl'),box=T.getBoundingClientRect(),X=ev=>(ev.clientX-box.left+T.scrollLeft-OFF)/pps;
+  const dI=e.target.dataset.del;if(dI!==undefined){save();P.tracks.splice(+dI,1);if(!find(sel))sel=null;all2();return}
+  const el=e.target.closest('.clip');
+  if(!el){if(playing)stop();sel=null;renderTL();renderProps();seek(X(e));
+    const mv=ev=>seek(X(ev)),up=()=>{removeEventListener('mousemove',mv);removeEventListener('mouseup',up)};
+    addEventListener('mousemove',mv);addEventListener('mouseup',up);return}
+  const c=find(el.dataset.id),mode=e.target.classList.contains('l')?'l':e.target.classList.contains('r')?'r':'m';
+  save();sel=c.id;renderProps();
+  const x0=e.clientX,s0=c.start,i0=c.inPt,d0=c.dur,lim=c.mid&&c.type!=='image'?P.media[c.mid].dur:1e9;
+  const mv=ev=>{const d=(ev.clientX-x0)/pps;
+    if(mode==='m'){let ns=Math.max(0,s0+d),a=snapTo(ns),b=snapTo(ns+d0)-d0;c.start=Math.max(0,a!==ns?a:b);
+      const ri=Math.floor((ev.clientY-box.top+T.scrollTop-RH)/ROW),tr=P.tracks[ri];
+      if(tr&&tr.kind===kindOf(c)&&!tr.clips.includes(c)){trackOf(c).clips.splice(trackOf(c).clips.indexOf(c),1);tr.clips.push(c)}}
+    else if(mode==='l'){const lo=Math.max(-s0,c.type==='image'||c.type==='text'?-s0:-i0/c.p.speed);
+      let dl=Math.min(Math.max(snapTo(s0+d)-s0,lo),d0-.1);c.start=s0+dl;c.inPt=i0+dl*c.p.speed;c.dur=d0-dl}
+    else{c.dur=Math.min(Math.max(snapTo(s0+d0+d)-s0,.1),(lim-i0)/c.p.speed)}
+    renderTL();render()};
+  const up=()=>{removeEventListener('mousemove',mv);removeEventListener('mouseup',up);P.tracks.forEach(fix);renderTL();render()};
+  addEventListener('mousemove',mv);addEventListener('mouseup',up);renderTL();
+};
+$('#zoom').oninput=e=>{pps=+e.target.value;renderTL();render()};
+
+// ---------- แก้ไข: ตัด / ลบ ----------
+function split(){
+  const ok=c=>t>c.start+.05&&t<c.start+c.dur-.05,list=(sel?[find(sel)]:all()).filter(c=>c&&ok(c));
+  if(!list.length)return;save();
+  for(const c of list){const n=JSON.parse(JSON.stringify(c));n.id='c'+uid++;n.start=t;n.inPt=c.inPt+(t-c.start)*c.p.speed;if(n.kf)for(const k in n.kf)n.kf[k].forEach(q=>q.t-=t-c.start);n.dur=c.start+c.dur-t;c.dur=t-c.start;trackOf(c).clips.push(n)}
+  all2();
+}
+function del(){const c=find(sel);if(!c)return;save();const r=trackOf(c);r.clips.splice(r.clips.indexOf(c),1);fix(r);sel=null;all2()}
+$('#sp').onclick=split;$('#dl').onclick=del;$('#un').onclick=undo;$('#re').onclick=redoF;
+
+// ---------- Properties ----------
+function renderProps(){
+  const c=sel&&find(sel),B=$('#props');
+  if(!c){B.innerHTML='<h2>คุณสมบัติ</h2><p class="hint">เลือกคลิปบน Timeline เพื่อแก้ไข</p>';return}
+  const cm=[['x','ตำแหน่ง X',0,1,.01],['y','ตำแหน่ง Y',0,1,.01],['scale','ขนาด',.1,4,.01],['rot','หมุน',-180,180,1],['opacity','ความโปร่งใส',0,1,.01]],vol=['volume','ความดัง',0,1,.01],au=[vol,['fi','Fade in (วินาที)',0,5,.1],['fo','Fade out (วินาที)',0,5,.1]],sp=['speed','ความเร็ว',.25,4,.05],fx=[['tin','เอฟเฟกต์เข้า'],['tout','เอฟเฟกต์ออก'],['td','ระยะเวลาเอฟเฟกต์ (วินาที)',.1,3,.1]],mk=[['mask','มาสก์'],['msize','ขนาดมาสก์',.1,1,.01]],
+    ad=[['preset','ฟิลเตอร์'],['bright','ความสว่าง',0,2,.01],['contrast','คอนทราสต์',0,2,.01],['sat','ความอิ่มสี',0,2,.01],['hue','เฉดสี',-180,180,1],['blur','เบลอ',0,20,.5]];
+  const f=c.type==='audio'?[sp,...au]:c.type==='text'?[['text','ข้อความ'],['size','ขนาดตัวอักษร',20,300,1],['color','สี'],...cm,...fx]:[...cm,...ad,...mk,...fx,...(c.type==='video'?[sp,...au]:[])];
+  B.innerHTML='<h2>คุณสมบัติ</h2>'+f.map(([k,l,mn,mx,st])=>`<label>${l}`+(SEL[k]?`<select data-k="${k}">`+Object.keys(SEL[k]).map(o=>`<option value="${o}">${SEL[k][o]}</option>`).join('')+'</select>':k==='text'?'<input data-k="text">':k==='color'?'<input type="color" data-k="color">':`<input type="range" data-k="${k}" min="${mn}" max="${mx}" step="${st}">`)+(KF.includes(k)?`<button data-kf="${k}" title="คีย์เฟรม ณ ตำแหน่ง Playhead">${kfAt(c,k)?'◆':'◇'} คีย์เฟรม</button>`:'')+'</label>').join('');
+  B.querySelectorAll('input,select').forEach(i=>{i.value=val(c,i.dataset.k,t-c.start)});
+  if(c.type==='video'||c.type==='audio')B.insertAdjacentHTML('beforeend','<h2 style="margin-top:14px">ซับไตเติ้ลอัตโนมัติ</h2><select id="lang"><option value="th">ไทย</option><option value="en">English</option><option value="ja">日本語</option><option value="zh">中文</option></select><button id="cap">สร้างซับอัตโนมัติ</button>');
+}
+$('#props').oninput=e=>{const c=find(sel),k=e.target.dataset.k;if(!c||!k)return;
+  if(!dirty){save();dirty=true}
+  const nv=e.target.type==='range'?parseFloat(e.target.value):e.target.value;
+  if(k==='speed')c.dur=c.dur*c.p.speed/nv;
+  if(c.kf&&c.kf[k]){const lt=t-c.start;if(lt<0||lt>c.dur)return msg('เลื่อน Playhead เข้าในคลิปเพื่อแก้คีย์เฟรม');kfSet(c,k,lt,nv)}else c.p[k]=nv;
+  if(k==='speed'){fix(trackOf(c));renderTL()}if(k==='text')renderTL();render()};
+$('#props').onchange=()=>{dirty=false};
+
+$('#ratio').onchange=e=>{[P.W,P.H]=e.target.value.split('x').map(Number);cv.width=P.W;cv.height=P.H;render()};
+
+// ---------- คีย์ลัด ----------
+addEventListener('keydown',e=>{
+  if(e.target.matches('input:not([type])'))return;
+  const k=e.key.toLowerCase();
+  if(e.code==='Space'){e.preventDefault();playing?stop():play()}
+  else if((e.ctrlKey||e.metaKey)&&k==='b'){e.preventDefault();split()}
+  else if((e.ctrlKey||e.metaKey)&&k==='z'){e.preventDefault();e.shiftKey?redoF():undo()}
+  else if((e.ctrlKey||e.metaKey)&&k==='y'){e.preventDefault();redoF()}
+  else if(k==='delete'||k==='backspace')del();
+});
+
+// ---------- Keyframes / Transitions / Masks / Captions ----------
+const KF=['x','y','scale','rot','opacity'];
+const TRN={none:'ไม่มี',fade:'จาง',slide:'สไลด์',zoom:'ซูม',wipe:'ปัด'},MKN={none:'ไม่มี',circle:'วงกลม',ellipse:'วงรี',rect:'สี่เหลี่ยม'};
+const SEL={preset:PRN,tin:TRN,tout:TRN,mask:MKN};
+function val(c,k,lt){const a=c.kf&&c.kf[k];if(!a||!a.length)return c.p[k];if(lt<=a[0].t)return a[0].v;const z=a[a.length-1];if(lt>=z.t)return z.v;
+  let i=1;while(a[i].t<lt)i++;const u=a[i-1],v=a[i];let f=(lt-u.t)/(v.t-u.t);f=f*f*(3-2*f);return u.v+(v.v-u.v)*f}
+function kfSet(c,k,lt,v){const a=c.kf[k],i=a.findIndex(q=>Math.abs(q.t-lt)<.05);if(i>=0)a[i].v=v;else{a.push({t:lt,v});a.sort((x,y)=>x.t-y.t)}}
+const kfAt=(c,k)=>(c.kf&&c.kf[k]||[]).some(q=>Math.abs(q.t-(t-c.start))<.05);
+function wrap(txt,mw){const tk=window.Intl&&Intl.Segmenter?[...new Intl.Segmenter('th',{granularity:'word'}).segment(txt)].map(x=>x.segment):[...txt];
+  const out=[];let line='';for(const w of tk){if(line&&g.measureText(line+w).width>mw){out.push(line.trim());line=w.trimStart()}else line+=w}out.push(line.trim());return out}
+$('#props').onclick=e=>{
+  if(e.target.id==='cap')return caption();
+  const k=e.target.dataset.kf;if(!k)return;const c=find(sel),lt=t-c.start;
+  if(lt<0||lt>c.dur)return msg('เลื่อน Playhead เข้าในคลิปก่อน');
+  save();c.kf=c.kf||{};const a=c.kf[k]=c.kf[k]||[],i=a.findIndex(q=>Math.abs(q.t-lt)<.05);
+  if(i>=0)a.splice(i,1);else kfSet(c,k,lt,val(c,k,lt));
+  if(!a.length)delete c.kf[k];renderProps();render()};
+async function caption(){
+  const c=find(sel),m=c&&c.mid&&P.media[c.mid];if(!m||m.missing||!m.url)return msg('ต้องนำเข้าไฟล์ต้นฉบับของคลิปนี้ก่อน');
+  msg('กำลังเตรียมเสียง…');
+  try{
+    const buf=await AC.decodeAudioData(await (await fetch(m.url)).arrayBuffer()),sp=c.p.speed,len=Math.min(c.dur*sp,buf.duration-c.inPt);
+    if(len>600)return msg('คลิปยาวเกิน 10 นาที กรุณาตัดแบ่งก่อน');
+    const R=16000,oc=new OfflineAudioContext(1,Math.ceil(len*R),R),src=oc.createBufferSource();src.buffer=buf;src.connect(oc.destination);src.start(0,c.inPt,len);
+    const d=(await oc.startRendering()).getChannelData(0),w=new DataView(new ArrayBuffer(44+d.length*2)),str=(o,x)=>[...x].forEach((ch,i)=>w.setUint8(o+i,ch.charCodeAt(0)));
+    str(0,'RIFF');w.setUint32(4,36+d.length*2,true);str(8,'WAVEfmt ');w.setUint32(16,16,true);w.setUint16(20,1,true);w.setUint16(22,1,true);
+    w.setUint32(24,R,true);w.setUint32(28,R*2,true);w.setUint16(32,2,true);w.setUint16(34,16,true);str(36,'data');w.setUint32(40,d.length*2,true);
+    d.forEach((v,i)=>w.setInt16(44+i*2,Math.max(-1,Math.min(1,v))*32767,true));
+    const u=new Uint8Array(w.buffer);let b='';for(let i=0;i<u.length;i+=32768)b+=String.fromCharCode.apply(null,u.subarray(i,i+32768));
+    msg('กำลังถอดเสียง (อาจใช้เวลาสักครู่)…');
+    const segs=await run('transcribe',btoa(b),$('#lang').value);
+    save();let r=P.tracks.find(x=>x.kind==='text'&&x.name==='ซับไตเติ้ล');if(!r){r={name:'ซับไตเติ้ล',kind:'text',clips:[]};P.tracks.unshift(r)}
+    segs.forEach(q=>r.clips.push({id:'c'+uid++,type:'text',start:c.start+q.start/sp,inPt:0,dur:Math.max(.3,(q.end-q.start)/sp),p:{...P0,y:.88,text:q.text,size:52,color:'#ffffff'}}));
+    fix(r);all2();msg('สร้างซับแล้ว '+segs.length+' บรรทัด')
+  }catch(err){msg('สร้างซับไม่สำเร็จ: '+(err.message||err))}}
+
+// ---------- เพิ่ม/ลบแทร็ก ----------
+const addTrack=k=>{save();const n=P.tracks.filter(r=>r.kind===k).length+1,r={name:{video:'วิดีโอ',audio:'เสียง',text:'ข้อความ'}[k]+' '+n,kind:k,clips:[]};
+  k==='text'?P.tracks.unshift(r):k==='audio'?P.tracks.push(r):P.tracks.splice(Math.max(0,P.tracks.findIndex(x=>x.kind==='video')),0,r);all2()};
+$('#at').onclick=()=>addTrack('video');$('#aa').onclick=()=>addTrack('audio');$('#ax').onclick=()=>addTrack('text');
+
+// ---------- โปรเจกต์ (Google Drive) ----------
+const run=(fn,...a)=>new Promise((ok,no)=>google.script.run.withSuccessHandler(ok).withFailureHandler(no)[fn](...a));
+async function listPrj(){try{const l=await run('listProjects');$('#prj').innerHTML='<option value="">เปิดโปรเจกต์…</option>'+l.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}catch(e){}}
+$('#sv').onclick=async()=>{const name=$('#pname').value.trim();if(!name)return msg('ตั้งชื่อโปรเจกต์ก่อน');
+  const d={W:P.W,H:P.H,uid,tracks:P.tracks,media:Object.values(P.media).map(({id,name,type,dur})=>({id,name,type,dur}))};
+  try{prjId=await run('saveProject',name,JSON.stringify(d),prjId);msg('บันทึกแล้ว');listPrj()}catch(e){msg('บันทึกไม่สำเร็จ: '+e.message)}};
+$('#prj').onchange=async e=>{if(!e.target.value)return;
+  try{const d=JSON.parse(await run('loadProject',e.target.value));prjId=e.target.value;$('#pname').value=e.target.selectedOptions[0].text;stop();
+    P.W=d.W;P.H=d.H;cv.width=P.W;cv.height=P.H;$('#ratio').value=P.W+'x'+P.H;uid=d.uid;P.tracks=d.tracks;P.media={};hist=[];redo=[];sel=null;t=0;
+    d.media.forEach(m=>{P.media[m.id]={...m,el:document.createElement(m.type==='image'?'img':m.type),missing:true}});
+    renderMedia();all2();msg('เปิดแล้ว กรุณานำเข้าไฟล์ต้นฉบับชื่อเดิมอีกครั้งเพื่อเชื่อมคลิป')}
+  catch(err){msg('เปิดไม่สำเร็จ: '+err.message)}};
+
+renderMedia();renderTL();renderProps();render();listPrj();
+</script>
+</body></html>
