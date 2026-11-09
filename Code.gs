@@ -2,7 +2,7 @@
 var APP_NAME = 'Mini Editor';
 // URL ไอคอนแท็บ ต้องเป็นลิงก์ตรงของไฟล์ภาพที่ลงท้ายด้วย .png เช่น
 // 'https://raw.githubusercontent.com/ชื่อผู้ใช้/ชื่อรีโพ/main/favicon-64.png'
-var ICON_URL = 'https://slobqtll.github.io/SAPSUT/';
+var ICON_URL = '';
 
 function doGet() {
   var out = HtmlService.createHtmlOutputFromFile('Index')
